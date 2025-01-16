@@ -81,16 +81,15 @@ const ArticleItem = React.memo(({ item, priority = false }) => {
     e.preventDefault();
 
     try {
-        // Get a fresh download URL
         const storageRef = ref(storage, item.image);
         const downloadUrl = await getDownloadURL(storageRef);
 
-        // Log download in user history if logged in
+        // Log the download in history first
         if (session?.user?.email) {
             try {
                 const userDownloadsRef = collection(db, 'users', session.user.email, 'downloadHistory');
                 await addDoc(userDownloadsRef, {
-                    imageUrl: item.image, // Store original path instead of URL
+                    imageUrl: item.image,
                     title: item.title,
                     timestamp: new Date(),
                     articleId: item.id,
@@ -98,30 +97,16 @@ const ArticleItem = React.memo(({ item, priority = false }) => {
                 });
             } catch (error) {
                 console.error("Error saving download history:", error);
-                // Continue with download even if history saving fails
             }
         }
 
-        // Perform the download
-        const response = await fetch(downloadUrl);
-        if (!response.ok) throw new Error('Download failed');
-
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        
-        // Get filename from path
-        const decodedPath = decodeURIComponent(item.image);
-        const fileName = decodedPath.split('/').pop().split('?')[0] + '.png';
-
-        // Create download link
+        // Create a temporary anchor element
         const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
+        link.href = downloadUrl;
+        link.setAttribute('download', ''); // This triggers download instead of navigation
+        link.setAttribute('target', '_blank'); // Open in new tab as fallback
         document.body.appendChild(link);
         link.click();
-        
-        // Cleanup
-        window.URL.revokeObjectURL(blobUrl);
         document.body.removeChild(link);
 
     } catch (error) {
