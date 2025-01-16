@@ -100,39 +100,23 @@ const ArticleItem = React.memo(({ item, priority = false }) => {
             }
         }
 
-        // Fetch the image with proper headers
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-                'Origin': window.location.origin,
-            },
-            mode: 'cors',
-        });
-
-        if (!response.ok) throw new Error('Download failed');
-
-        // Get the filename from the content-disposition header or use a default
-        const contentDisposition = response.headers.get('content-disposition');
-        let filename = 'image.png';
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-            if (filenameMatch) filename = filenameMatch[1];
-        } else {
-            // Fallback to getting filename from URL
-            const decodedPath = decodeURIComponent(item.image);
-            filename = decodedPath.split('/').pop().split('?')[0];
+        // Open image in new tab for download
+        const newWindow = window.open('');
+        if (newWindow) {
+            newWindow.document.write(`
+                <html>
+                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f5f5f5;">
+                        <img src="${downloadUrl}" style="max-width:100%;max-height:100vh;" />
+                    </body>
+                    <script>
+                        // Add right-click context menu back
+                        document.addEventListener('contextmenu', function(e) {
+                            e.stopPropagation();
+                        }, true);
+                    </script>
+                </html>
+            `);
         }
-
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
 
     } catch (error) {
         console.error("Download error:", error);
