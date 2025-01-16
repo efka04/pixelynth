@@ -23,7 +23,9 @@ export default function ArticlePage() {
 
   useEffect(() => {
     if (params.articleId) {
-      getPostDetails()
+      const parts = params.articleId.split('-')
+      const docId = parts[parts.length - 1]
+      getPostDetails(docId)
     }
   }, [params.articleId])
 
@@ -39,9 +41,9 @@ export default function ArticlePage() {
     }
   }, [articleDetails]);
 
-  const getPostDetails = async () => {
+  const getPostDetails = async (docId) => {
     try {
-      const docRef = doc(db, 'post', params.articleId)
+      const docRef = doc(db, 'post', docId)
       const docSnap = await getDoc(docRef)
       if (docSnap.exists()) {
         setArticleDetails(docSnap.data())
@@ -87,8 +89,15 @@ export default function ArticlePage() {
     }
   };
 
+  const generateSlug = (title) => {
+    return title.toLowerCase().replace(/\s+/g, '-');
+  };
+
   const handleEdit = () => {
-    router.push(`/articles/${params.articleId}/edit`)
+    const slug = generateSlug(articleDetails.title)
+    const parts = params.articleId.split('-')
+    const docId = parts[parts.length - 1]
+    router.push(`/articles/${slug}-${docId}/edit`)
   }
 
   const handleDownload = async (e) => {
@@ -205,7 +214,13 @@ export default function ArticlePage() {
               onClick={handleDownload} 
               className='bg-black hover:bg-gray-600 px-3 py-2 text-sm text-white rounded-lg'
             >
-              Download Image
+              Download
+            </button>
+            <button 
+              onClick={() => router.push('/license')}
+              className='bg-white px-3 py-2 text-sm text-gray-400'
+            >
+              License
             </button>
             {/*<button 
               onClick={handleAddFavorite} 
@@ -220,7 +235,7 @@ export default function ArticlePage() {
       </div>
       {/* Similar Articles Section */}
       <div className='mt-16 mb-8'>
-        <h2 className='text-2xl font-bold mb-8'>More Articles</h2>
+        <h2 className='text-2xl font-bold mb-8'>More Photos</h2>
         <div className='w-full'>
           <ArticleList 
             listPosts={morePosts}

@@ -1,4 +1,5 @@
-xxx
+require('dotenv').config();
+
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from 'firebase/firestore'; // Ensure Firestore is imported
@@ -6,7 +7,7 @@ import { getStorage } from 'firebase/storage'; // Keep only one import
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDgtVQmAWEEyC8CWMJf84j62-OSpiAxgek",
+  apiKey: process.env.NEXT_PUBLIC_API_KEY, // Updated to use NEXT_PUBLIC_API_KEY
   authDomain: "pixelynth-c41ea.firebaseapp.com",
   projectId: "pixelynth-c41ea",
   storageBucket: "pixelynth-c41ea.firebasestorage.app",
@@ -22,3 +23,4 @@ const db = getFirestore(app); // Ensure Firestore is initialized
 const storage = getStorage(app);
 
 export { app, db, storage };
+

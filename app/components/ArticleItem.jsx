@@ -78,59 +78,75 @@ const ArticleItem = React.memo(({ item }) => {
 
   const handleDownload = useCallback(async (e) => {
     e.stopPropagation();
-    
-    // Removed authentication check
-    // if (!session?.user?.email) {
-    //   router.push('/login');
-    //   return;
-    // }
+    e.preventDefault();
 
     try {
-      // Get the download URL
-      const storageRef = ref(storage, item.image);
-      const downloadUrl = await getDownloadURL(storageRef);
-      
-      // Conditionally create user-specific download history collection
-      if (session?.user?.email) {
-        const userDownloadsRef = collection(db, 'users', session.user.email, 'downloadHistory');
-        
-        // Save download record
-        await addDoc(userDownloadsRef, {
-          imageUrl: downloadUrl,
-          title: item.title,
-          timestamp: new Date(),
-          articleId: item.id,
-          userName: item.userName,
-        });
+        // Get a fresh download URL
+        const storageRef = ref(storage, item.image);
+        const downloadUrl = await getDownloadURL(storageRef);
 
-        console.log("Download saved to user's history");
-      }
+        // Log download in user history if logged in
+        if (session?.user?.email) {
+            try {
+                const userDownloadsRef = collection(db, 'users', session.user.email, 'downloadHistory');
+                await addDoc(userDownloadsRef, {
+                    imageUrl: item.image, // Store original path instead of URL
+                    title: item.title,
+                    timestamp: new Date(),
+                    articleId: item.id,
+                    userName: item.userName,
+                });
+            } catch (error) {
+                console.error("Error saving download history:", error);
+                // Continue with download even if history saving fails
+            }
+        }
 
-      // Download logic
-      const xhr = new XMLHttpRequest();
-      xhr.responseType = 'blob';
-      xhr.onload = function(event) {
-        const blob = xhr.response;
+        // Perform the download
+        const response = await fetch(downloadUrl);
+        if (!response.ok) throw new Error('Download failed');
+
+        const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
         
-        // Décoder l'URL et extraire le nom du fichier
+        // Get filename from path
         const decodedPath = decodeURIComponent(item.image);
         const fileName = decodedPath.split('/').pop().split('?')[0] + '.png';
-        
+
+        // Create download link
+        const link = document.createElement('a');
+        link.href = blobUrl;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        
+        // Cleanup
         window.URL.revokeObjectURL(blobUrl);
-      };
-      xhr.open('GET', downloadUrl);
-      xhr.send();
+        document.body.removeChild(link);
+
     } catch (error) {
-      console.error("Error during download:", error);
+        console.error("Download error:", error);
+        alert("Failed to download image. Please try again.");
     }
-  }, [item, storage, session?.user?.email, router]);
+}, [item, storage, session?.user?.email]);
+
+  const getJpgUrl = (pngUrl, appendJpg = true) => {
+    if (!pngUrl) return '';
+    
+    // Extraire le nom du fichier de l'URL PNG
+    const filename = pngUrl
+      .split('/o/')[1]  // Prendre la partie après /o/
+      .split('?')[0]    // Enlever les paramètres
+      .split('%2F')[1]  // Prendre le nom après images%2F
+      .replace('.png', '');  // Enlever l'extension
+      
+    // Construire l'URL JPG avec the option to append .jpg
+    if (appendJpg) {
+      return `https://firebasestorage.googleapis.com/v0/b/pixelynth-c41ea.firebasestorage.app/o/jpg%2F${filename}.jpg?alt=media`;
+    } else {
+      return `https://firebasestorage.googleapis.com/v0/b/pixelynth-c41ea.firebasestorage.app/o/jpg%2F${filename}?alt=media`;
+    }
+  }
 
   return (
     <div className='relative group'>
@@ -151,7 +167,7 @@ const ArticleItem = React.memo(({ item }) => {
         {item?.image && (
           <>
             <Image
-              src={item?.image}
+              src={getJpgUrl(item?.image, true)} // Added appendJpg parameter
               alt={item?.title || "Image"}
               width={500}
               height={500}
@@ -162,6 +178,9 @@ const ArticleItem = React.memo(({ item }) => {
               sizes="(max-width: 600px) 100vw, (max-width: 1200px) 50vw, 33vw"
               placeholder="blur"
               blurDataURL={item?.blurDataUrl || BLUR_DATA_URL}
+              onError={(e) => {
+                e.target.src = getJpgUrl(item?.image, false); // Fallback without .jpg
+              }}
             />
             {/* Add gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent rounded-b-3xl z-20" />

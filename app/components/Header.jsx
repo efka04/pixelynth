@@ -1,6 +1,6 @@
 'use client'
 import { IoSearchOutline } from "react-icons/io5";
-import { FaPlus, FaHeart, FaUser, FaImage, FaRightFromBracket, FaUpload, FaChevronLeft, FaChevronRight, FaClockRotateLeft } from "react-icons/fa6";
+import { FaPlus, FaHeart, FaUser, FaImage, FaSignOutAlt, FaUpload, FaChevronLeft, FaChevronRight, FaTimes, FaClock } from "react-icons/fa"; // Replaced FaRightFromBracket with FaSignOutAlt
 import { FiSettings } from "react-icons/fi";
 import { IoIosArrowDown, IoIosNotifications } from "react-icons/io";
 import Logo from "../../public/logo-pixelynth.svg";
@@ -16,6 +16,7 @@ import { useCategory } from '../context/CategoryContext';
 import { useSearch } from '../context/SearchContext';
 import { useColor } from '../context/ColorContext';
 import { getAuth, onAuthStateChanged } from "firebase/auth"; // Import Firebase Auth
+import { AiOutlineClose } from "react-icons/ai"; // Import AiOutlineClose for a thinner cross
 
 export default function Header() {
     const { performSearch, isSearching } = useSearch();
@@ -47,7 +48,7 @@ export default function Header() {
 
     useEffect(() => {
         const checkAdmin = async () => {
-            const auth = getAuth();
+            const auth = getAuth(app); // Initialize Auth with the Firebase app
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     const idTokenResult = await user.getIdTokenResult();
@@ -60,21 +61,23 @@ export default function Header() {
         checkAdmin();
     }, []);
 
-    const handleSearch = (value) => {
+    const handleSearch = useCallback((value) => {
         setSearchTerm(value);
-        console.log('Search term:', value); // Debug log
-        performSearch(value);
-    };
+        // Only search if there are 2 or more characters, or if clearing the search
+        if (value.length >= 2 || value === '') {
+            performSearch(value, selectedCategory);
+        }
+    }, [performSearch, selectedCategory]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log('Form submitted with:', searchTerm); // Debug log
-        performSearch(searchTerm);
+        console.log('Form submitted with:', searchTerm, selectedCategory); // Debug log
+        performSearch(searchTerm, selectedCategory); // Pass selectedCategory
     };
 
     const handleCategoryClick = (category) => {
-        setSelectedCategory(category);
-        debouncedSearch(searchTerm, category);
+        setSelectedCategory(category === 'All Categories' ? 'all' : category);
+        debouncedSearch(searchTerm, category === 'All Categories' ? 'all' : category);
     };
 
     const saveUserInfo = async () => {
@@ -156,8 +159,18 @@ export default function Header() {
                                         placeholder="Search..."
                                         className="bg-transparent outline-none w-full"
                                     />
-                                    {isSearching && (
+                                    {isSearching && searchTerm.length >= 2 && (
                                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent"/>
+                                    )}
+                                    {searchTerm && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSearch('')}
+                                            className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                                            aria-label="Clear search"
+                                        >
+                                            <AiOutlineClose className="text-3xl" /> {/* Replaced FaTimes with AiOutlineClose and matched size */}
+                                        </button>
                                     )}
                                 </div>
                             </form>
@@ -185,7 +198,7 @@ export default function Header() {
                                             href={`/dashboard/${session.user.email}/downloadHistory`}
                                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                                         >
-                                            <FaClockRotateLeft className="text-gray-500" />
+                                            <FaClock className="text-gray-500" /> {/* Replaced FaClockRotateLeft with FaClock */}
                                             <span>Download History</span>
                                         </Link>
                                         <Link
@@ -224,7 +237,7 @@ export default function Header() {
                                             onClick={() => signOut()}
                                             className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-red-500"
                                         >
-                                            <FaRightFromBracket />
+                                            <FaSignOutAlt />
                                             <span>Logout</span>
                                         </button>
                                     </div>

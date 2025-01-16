@@ -10,11 +10,12 @@ function ArticleInfo({ articleDetails }) {
 
   return (
     <div>
-      <h2 className='text-[30px] font-bold mb-10'>{articleDetails?.title}</h2> 
-      <UserTag user={user} />
+            <UserTag user={user} />
+
+      <h2 className='text-[30px] my-5 font-bold mb-10'>{articleDetails?.title}</h2> 
  
       
-      <h2 className='mt-10'>{articleDetails?.desc}</h2>
+      <h2 className='mt-10 -translate-y-8'>{articleDetails?.desc}</h2>
     </div>
   );
 }

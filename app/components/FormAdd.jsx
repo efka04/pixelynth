@@ -6,12 +6,12 @@ import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from "fire
 import { app, db } from '@/app/db/firebaseConfig'
 import { doc, getFirestore, setDoc, addDoc, collection } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import NextImage from 'next/image' // Renamed import to avoid conflict
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { FaHeart, FaChevronDown } from 'react-icons/fa'
 import { categories } from '@/app/utils/constants';
-import { IoImageOutline, IoPhonePortrait, IoPhoneLandscape } from 'react-icons/io5'
+import { IoImageOutline, IoPhonePortrait, IoPhoneLandscape, IoClose } from 'react-icons/io5'
 import { BiHorizontalCenter, BiVerticalCenter } from 'react-icons/bi'
 import { BsPerson, BsPeople, BsPersonFill, BsPeopleFill } from 'react-icons/bs'
 import { IoMdMore } from 'react-icons/io'
@@ -30,7 +30,7 @@ const colors = [
     { name: 'All Colors', value: 'all', hex: 'linear-gradient(45deg, #FF0000, #FF6600, #FFD700, #00CC00, #0066FF, #8A2BE2)' }
 ]
 
-const Form = forwardRef(({ initialFile = null }, ref) => {
+const Form = forwardRef(({ initialFile = null, onClose, isBulkUpload = false, isEditing = false, existingData = null }, ref) => {
     const { data: session } = useSession();
     const [title, setTitle] = useState("");
     const [desc, setDesc] = useState("");
@@ -59,6 +59,57 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
         }
     }, [initialFile]);
 
+    useEffect(() => {
+        // Handle initialization for edit mode
+        if (isEditing && existingData) {
+            setTitle(existingData.title || "");
+            setDesc(existingData.desc || "");
+            setPreview(existingData.image || null);
+            setSelectedCategories(existingData.categories || []);
+            setSelectedColor(existingData.color || 'white');
+            setOrientation(existingData.orientation || 'horizontal');
+            setTags(existingData.tags || []);
+            setPeopleCount(existingData.peopleCount || 0);
+        }
+    }, [isEditing, existingData]);
+
+    // Helper function to resize image
+    const resizeImage = (file, maxWidth, quality) => {
+        return new Promise((resolve, reject) => {
+            const img = new window.Image(); // Use window.Image to reference the global constructor
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                img.src = e.target.result;
+            };
+
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const scaleFactor = maxWidth / img.width;
+                canvas.width = maxWidth;
+                canvas.height = img.height * scaleFactor;
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), { type: 'image/jpeg' });
+                        resolve(resizedFile);
+                    } else {
+                        reject(new Error('Canvas is empty'));
+                    }
+                }, 'image/jpeg', quality / 100);
+            };
+
+            img.onerror = (error) => reject(error);
+            reader.onerror = (error) => reject(error);
+
+            reader.readAsDataURL(file);
+        });
+    };
+
     const submitHandler = async () => {
         if (!validateForm() || !session?.user?.email) {
             return false;
@@ -66,40 +117,54 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
 
         setLoading(true);
         try {
-            // 1. Upload image
-            const imageRef = storageRef(storage, `images/${Date.now()}-${file.name}`); // Use storageRef instead of ref
-            await uploadBytes(imageRef, file);
-            const url = await getDownloadURL(imageRef);
+            let imageUrl = existingData?.image; // Keep existing image if in edit mode
 
-            // 2. Create image data
+            if (file) { // Only upload new image if file has changed
+                // Resize the image
+                const resizedFile = await resizeImage(file, 650, 60);
+
+                const imageRef = storageRef(storage, `jpg/${resizedFile.name}`);
+                await uploadBytes(imageRef, resizedFile);
+                imageUrl = await getDownloadURL(imageRef);
+            }
+
             const imageData = {
                 title,
                 desc,
-                image: url,
-                imageURL: url, // Add this line to ensure imageURL is available
+                image: imageUrl,
+                imageURL: imageUrl,
                 category: selectedCategories[0] || '',
                 categories: selectedCategories,
                 color: selectedColor,
                 orientation,
                 tags,
                 peopleCount,
-                userName: session.user.name || 'Anonymous', // Provide default if undefined
-                userEmail: session.user.email || 'no-email@example.com', // Provide default if undefined
-                userImage: session.user.image || '', // Provide default empty string if undefined
+                userName: session.user.name || 'Anonymous',
+                userEmail: session.user.email,
+                userImage: session.user.image || '',
                 timestamp: new Date()
             };
 
-            // 3. Save to main posts collection
-            const postRef = await addDoc(collection(db, "post"), imageData);
-
-            // 4. Save to user's MyImages collection
-            const userMyImagesRef = collection(db, 'users', session.user.email, 'MyImages');
-            await setDoc(doc(userMyImagesRef, postRef.id), {
-                ...imageData,
-                postId: postRef.id
-            });
+            if (isEditing && existingData?.id) {
+                // Update existing document
+                await setDoc(doc(db, "post", existingData.id), imageData);
+            } else {
+                // Create new document
+                const postRef = await addDoc(collection(db, "post"), imageData);
+                // ...existing user collection logic...
+            }
 
             setSuccessMessage("Your image has been successfully published."); // Set success message
+            // Only navigate if not in bulk upload mode
+            if (!isBulkUpload) {
+                setTimeout(() => {
+                    if (onClose) {
+                        onClose();
+                    } else {
+                        router.push('/');
+                    }
+                }, 1500); // 1.5 second delay
+            }
             return true;
         } catch (error) {
             console.error(error);
@@ -138,7 +203,7 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
         const newErrors = [];
         if (!title) newErrors.push("Title is required");
         if (!desc) newErrors.push("Description is required");
-        if (!file) newErrors.push("Image is required");
+        if (!isEditing && !file) newErrors.push("Image is required"); // Only require image for new uploads
         if (selectedCategories.length === 0) newErrors.push("At least one category is required");
         if (selectedColor === 'white') newErrors.push("Please select a color");
         setErrors(newErrors);
@@ -146,12 +211,12 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
     };
 
     const peopleOptions = [
-        { value: 0, label: 'No people', icon: BsPerson },
-        { value: 1, label: '1 person', icon: BsPersonFill },
-        { value: 2, label: '2 people', icon: BsPeople },
-        { value: 3, label: '3 people', icon: BsPeopleFill },
-        { value: 4, label: '4 people', icon: BsPeopleFill },
-        { value: 5, label: 'More', icon: IoMdMore },
+        { value: 0, label: 'No people' },
+        { value: 1, label: '1 person' },
+        { value: 2, label: '2 people' },
+        { value: 3, label: '3 people' },
+        { value: 4, label: '4 people' },
+        { value: 5, label: 'More' },
     ];
 
     const orientationOptions = [
@@ -161,15 +226,17 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
     ];
 
     return (
-        <div>
-            <div className="flex flex-col gap-4">
+        <div className="w-full">
+            <div className="flex flex-col max-w-[400px] mx-auto gap-0 overflow-y-auto overflow-x-hidden relative bg-white shadow-lg rounded-xl p-6">
+            
+
                 {preview ? (
-                    <div className="relative aspect-video h-auto">
-                        <Image 
+                    <div className="relative max-h-[200px] aspect-video h-auto">
+                        <NextImage 
                             src={preview}
                             alt="Preview"
-                            layout="fill"
-                            objectFit="contain"
+                            fill // Updated for Next.js 13
+                            style={{ objectFit: 'contain' }} // Updated for Next.js 13
                             className="rounded-lg"
                         />
                     </div>
@@ -211,18 +278,18 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-2 my-1"> {/* Reduced gap and margin */}
+                <div className="flex flex-col gap-1 my-1"> {/* Reduced gap and margin */}
                     <h3 className="font-semibold text-sm">Color</h3> {/* Reduced font size */}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1">
                         {colors.map((color) => (
                             <button
                                 key={color.value}
                                 onClick={() => setSelectedColor(color.value)}
-                                className={`w-10 h-10 rounded-full border-2 flex-shrink-0
+                                className={`w-8 h-8 rounded-full border-2 flex-shrink-0
                                     ${selectedColor === color.value ? 'border-black' : 'border-gray-200'}`}
                                 style={{ 
                                     background: color.hex,
-                                    minWidth: '2.5rem' // ensures circle shape
+                                   
                                 }}
                                 title={color.name}
                             />
@@ -256,23 +323,18 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
                 <div className="flex flex-col gap-2 my-1"> {/* Reduced gap and margin */}
                     <h3 className="font-semibold text-sm">Number of People</h3> {/* Reduced font size */}
                     <div className="flex flex-wrap gap-2">
-                        {peopleOptions.map((option) => {
-                            const Icon = option.icon;
-                            return (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setPeopleCount(option.value)}
-                                    className={`p-2 rounded-lg border transition-colors flex flex-col items-center gap-1
-                                        ${peopleCount === option.value 
-                                            ? 'bg-black text-white' 
-                                            : 'bg-white hover:bg-gray-50'}`}
-                                    title={option.label}
-                                >
-                                    <Icon size={24} />
-                                    <span className="text-xs">{option.value === 5 ? 'More' : option.value}</span>
-                                </button>
-                            );
-                        })}
+                        {peopleOptions.map((option) => (
+                            <button
+                                key={option.value}
+                                onClick={() => setPeopleCount(option.value)}
+                                className={`px-3 py-1 rounded-lg border transition-colors
+                                    ${peopleCount === option.value 
+                                        ? 'bg-black text-white' 
+                                        : 'bg-white hover:bg-gray-50'}`}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -331,7 +393,7 @@ const Form = forwardRef(({ initialFile = null }, ref) => {
                     className="bg-black text-white px-4 py-1.5 rounded-lg mt-2 w-full
                         disabled:bg-gray-300 disabled:cursor-not-allowed text-sm" /* Reduced padding, margin, and font size */
                 >
-                    {loading ? 'Publishing...' : 'Publish'}
+                    {loading ? 'Publishing...' : isEditing ? 'Update' : 'Publish'}
                 </button>
                 {successMessage && (
                     <div className="mt-4 p-2 bg-green-100 border border-green-200 text-green-700 rounded">

@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../db/firebaseConfig';
 
@@ -13,6 +13,8 @@ export function SearchProvider({ children }) {
     const [selectedOrientation, setSelectedOrientation] = useState('all');
     const [selectedSort, setSelectedSort] = useState('relevance'); // Make sure this is defined
     const [selectedCategory, setSelectedCategory] = useState(''); // Add selectedCategory state
+    const [searchCache, setSearchCache] = useState({}); // Add cache for search results
+    const searchTimeout = useRef(null);
 
     // Fetch all posts initially
     const fetchAllPosts = async () => {
@@ -30,61 +32,72 @@ export function SearchProvider({ children }) {
         }
     };
 
-    const performSearch = async (searchTerm = '') => {
+    const checkExactWordMatch = (text, searchTerm) => {
+        if (!text) return false;
+        const words = text.toLowerCase().split(/\s+/);
+        return words.includes(searchTerm.toLowerCase());
+    };
+
+    const performSearch = async (searchTerm = '', category = '') => {
+        const trimmedSearchTerm = searchTerm.trim(); // Trim the search term
+
+        // Don't set loading state for empty searches
+        if (!trimmedSearchTerm) {
+            setSearchResults(allPosts);
+            setIsSearching(false);
+            return;
+        }
+
+        const cacheKey = `${trimmedSearchTerm}-${category}`; // Use trimmed search term for cache key
+        if (searchCache[cacheKey]) {
+            setSearchResults(searchCache[cacheKey]);
+            return;
+        }
+
         setIsSearching(true);
         try {
-            let filtered = [...allPosts];
+            // Clear previous timeout
+            if (searchTimeout.current) {
+                clearTimeout(searchTimeout.current);
+            }
 
-            // Debug log for first post
-            if (filtered.length > 0) {
-                console.log('First post data:', {
-                    ...filtered[0],
-                    keys: Object.keys(filtered[0])
+            // Set new timeout
+            searchTimeout.current = setTimeout(async () => {
+                const searchTerms = trimmedSearchTerm.toLowerCase().split(' ').filter(term => term);
+
+                const results = allPosts.filter(post => {
+                    const title = post.title || '';
+                    const desc = post.desc || '';
+                    const tags = post.tags || [];
+
+                    const categoryMatch = category === 'all' || 
+                        !category || 
+                        post.categories?.includes(category) || 
+                        post.category === category;
+                    const orientationMatch = selectedOrientation === 'all' ? true : 
+                        post.orientation === selectedOrientation;
+
+                    // Check if all search terms are exact matches in title, desc, or tags
+                    const allTermsMatch = searchTerms.every(term => 
+                        checkExactWordMatch(title, term) || 
+                        checkExactWordMatch(desc, term) || 
+                        tags.some(tag => checkExactWordMatch(tag, term))
+                    );
+
+                    return allTermsMatch && categoryMatch && orientationMatch;
                 });
-            }
 
-            // Apply category filter first
-            if (selectedCategory) {
-                filtered = filtered.filter(post => post.category === selectedCategory);
-            }
+                setSearchCache(prev => ({
+                    ...prev,
+                    [cacheKey]: results
+                }));
+                setSearchResults(results);
+                setIsSearching(false);
+            }, 300); // Debounce time
 
-            // Apply orientation filter
-            if (selectedOrientation !== 'all') {
-                filtered = filtered.filter(post => post.orientation === selectedOrientation);
-            }
-
-            if (selectedPeople !== 'all') {
-                filtered = filtered.filter(post => {
-                    const peopleCount = post.peopleCount || post.numberOfPeople || post.people;
-                    return String(peopleCount) === selectedPeople;
-                });
-            }
-
-            if (searchTerm.trim()) {
-                filtered = filtered.filter(post => {
-                    const descMatch = String(post.desc || '').toLowerCase().includes(searchTerm.toLowerCase());
-                    const titleMatch = String(post.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-                    return descMatch || titleMatch;
-                });
-            }
-
-            // Apply sorting
-            switch (selectedSort) {
-                case 'popular':
-                    filtered.sort((a, b) => (b.favoriteCount || 0) - (a.favoriteCount || 0));
-                    break;
-                case 'newest':
-                    filtered.sort((a, b) => b.createdAt - a.createdAt);
-                    break;
-                default: // 'relevance'
-                    // Keep default order or implement relevance logic
-                    break;
-            }
-
-            setSearchResults(filtered);
         } catch (error) {
             console.error('Search error:', error);
-        } finally {
+            setSearchResults([]);
             setIsSearching(false);
         }
     };
@@ -98,6 +111,14 @@ export function SearchProvider({ children }) {
     useEffect(() => {
         performSearch();
     }, [selectedPeople, selectedOrientation, selectedSort, selectedCategory]);
+
+    useEffect(() => {
+        return () => {
+            if (searchTimeout.current) {
+                clearTimeout(searchTimeout.current);
+            }
+        };
+    }, []);
 
     const value = {
         searchResults,

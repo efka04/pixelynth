@@ -5,17 +5,18 @@ import { useColor } from '../context/ColorContext';
 import { useSearch } from '../context/SearchContext';
 import { useCategory } from '../context/CategoryContext';
 
-const ITEMS_PER_PAGE = 24; // Increased from 12 to 24
-const PRELOAD_THRESHOLD = 0.5; // Start loading when 50% of the way through current items
+const ITEMS_PER_PAGE = 8; // Réduit pour un meilleur chargement initial
+const PRELOAD_THRESHOLD = 2; // Nombre de pages à précharger
 
 const ArticleList = React.memo(({ listPosts }) => {
   const { selectedColor } = useColor();
-  const { selectedPeople, selectedSort } = useSearch();
+  const { selectedPeople, selectedOrientation, selectedSort } = useSearch(); // Add selectedOrientation
   const { selectedCategory } = useCategory();
   const [displayedPosts, setDisplayedPosts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const observerTarget = useRef(null);
+  const [isPreloading, setIsPreloading] = useState(false);
 
   const filteredPosts = useMemo(() => {
     let posts = [...listPosts].filter(post => {
@@ -23,7 +24,9 @@ const ArticleList = React.memo(({ listPosts }) => {
       const peopleCount = post.peopleCount || post.numberOfPeople || post.people;
       const peopleMatch = selectedPeople === 'all' ? true : String(peopleCount) === selectedPeople;
       const categoryMatch = !selectedCategory ? true : post.category === selectedCategory;
-      return colorMatch && peopleMatch && categoryMatch;
+      const orientationMatch = selectedOrientation === 'all' ? true : post.orientation === selectedOrientation;
+
+      return colorMatch && peopleMatch && categoryMatch && orientationMatch;
     });
 
     // Apply sorting
@@ -39,32 +42,46 @@ const ArticleList = React.memo(({ listPosts }) => {
       default:
         return posts;
     }
-  }, [listPosts, selectedColor, selectedPeople, selectedSort, selectedCategory]);
+  }, [listPosts, selectedColor, selectedPeople, selectedSort, selectedCategory, selectedOrientation]); // Add selectedOrientation to dependencies
 
-  // Modify loadMorePosts to load two pages worth of posts at once
+  const preloadNextPage = useCallback(() => {
+    if (isPreloading) return;
+    setIsPreloading(true);
+    
+    const nextPageItems = filteredPosts.slice(
+      displayedPosts.length,
+      displayedPosts.length + ITEMS_PER_PAGE * PRELOAD_THRESHOLD
+    );
+    
+    // Précharger les images
+    nextPageItems.forEach(item => {
+      const img = new Image();
+      img.src = item.image.replace('/images/', '/jpg/').replace('.png', '.jpg');
+    });
+    
+    setIsPreloading(false);
+  }, [filteredPosts, displayedPosts.length, isPreloading]);
+
   const loadMorePosts = useCallback(() => {
     const nextPosts = filteredPosts.slice(0, page * ITEMS_PER_PAGE);
-    setDisplayedPosts(prevPosts => {
-      // Remove duplicates when adding new posts
-      const newPosts = [...new Set([...prevPosts, ...nextPosts])];
-      return newPosts;
-    });
+    setDisplayedPosts(nextPosts);
     setHasMore(nextPosts.length < filteredPosts.length);
-  }, [filteredPosts, page]);
+    
+    // Précharger la prochaine page
+    if (hasMore) {
+      preloadNextPage();
+    }
+  }, [filteredPosts, page, hasMore, preloadNextPage]);
 
-  // Observer with earlier trigger point
+  // Observer avec threshold plus élevé pour un chargement plus anticipé
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting && hasMore) {
-          // Load next page earlier
-          setPage(prev => prev + 2); // Increment by 2 to load more content at once
+          setPage(prev => prev + 1);
         }
       },
-      { 
-        threshold: PRELOAD_THRESHOLD,
-        rootMargin: '500px' // Start loading 500px before reaching the end
-      }
+      { threshold: 0.5, rootMargin: '100px' }
     );
 
     if (observerTarget.current) {
@@ -87,11 +104,21 @@ const ArticleList = React.memo(({ listPosts }) => {
 
   return (
     <>
-      <div className='mt-7 px-2 md:px-5 columns-2 md:columns-3 lg:columns-4 mb-4 xl:columns-4 space-y-6 mx-auto'>
-        {displayedPosts.map(item => (
-          <ArticleItem key={item.id} item={item} />
-        ))}
-      </div>
+      {displayedPosts.length === 0 ? (
+        <div className="text-center text-gray-500 mt-4">
+          No pictures found.
+        </div>
+      ) : (
+        <div className='mt-7 px-2 md:px-5 columns-2 md:columns-3 lg:columns-4 mb-4 xl:columns-4 space-y-6 mx-auto'>
+          {displayedPosts.map((item, index) => (
+            <ArticleItem 
+              key={item.id} 
+              item={item}
+              priority={index < ITEMS_PER_PAGE} // Priorité aux premières images
+            />
+          ))}
+        </div>
+      )}
       {hasMore && (
         <div ref={observerTarget} className="h-10 w-full flex items-center justify-center">
           <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-500 border-t-transparent" />

@@ -10,15 +10,18 @@ import { getStorage, ref, deleteObject } from 'firebase/storage'
 export default function EditArticle() {
     const { data: session } = useSession()
     const router = useRouter()
+    const params = useParams() // Initialize params properly
     const [articleData, setArticleData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
-        if (params.articleId) {
-            getArticleData()
+        if (params?.articleId) { // Add null check
+            const parts = params.articleId.split('-')
+            const docId = parts[parts.length - 1]
+            getArticleData(docId)
         }
-    }, [params.articleId])
+    }, [params?.articleId]) // Update dependency with null check
 
     useEffect(() => {
         if (!loading && articleData) {
@@ -28,16 +31,17 @@ export default function EditArticle() {
         }
     }, [session, articleData, loading])
 
-    const getArticleData = async () => {
+    const getArticleData = async (docId) => {
         try {
-            const docRef = doc(db, 'post', params.articleId)
+            const docRef = doc(db, 'post', docId)
             const docSnap = await getDoc(docRef)
             
             if (docSnap.exists()) {
-                setArticleData(docSnap.data())
+                setArticleData({ id: docSnap.id, ...docSnap.data() })
             }
         } catch (error) {
             console.error('Error fetching article:', error)
+            router.push('/') // Redirect on error
         } finally {
             setLoading(false)
         }
@@ -59,17 +63,28 @@ export default function EditArticle() {
         }
     }
 
+    const generateSlug = (title) => {
+        return title.toLowerCase().replace(/\s+/g, '-');
+    };
+
     if (loading) return <div>Loading...</div>
     
     if (!articleData) return <div>Article not found</div>
 
     return (
         <div className='bg-[#e9e9e9] min-h-screen p-8 px-[100px] md:px-[150px]'>
-            <FormAdd 
-                isEditing={true} 
-                existingData={articleData} 
-                articleId={params.articleId} 
-            />
+            {articleData && (
+                <FormAdd 
+                    isEditing={true} 
+                    existingData={articleData}
+                    onClose={() => {
+                        const slug = generateSlug(articleData.title)
+                        const parts = params.articleId.split('-')
+                        const docId = parts[parts.length - 1]
+                        router.push(`/articles/${slug}-${docId}`)
+                    }}
+                />
+            )}
             <button
                 onClick={handleDelete}
                 disabled={isDeleting}

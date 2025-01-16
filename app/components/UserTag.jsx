@@ -42,7 +42,7 @@ function UserTag({ user, color = 'black' }) {
           alt={displayName}
           width={30}
           height={30}
-          className='rounded-full sm:w-[40px] sm:h-[40px] w-[30px] h-[px]'
+          className='rounded-full sm:w-[40px] sm:h-[40px] w-[30px] h-[px] border border-black'
           onError={() => setImgError(true)}
           unoptimized
         />
