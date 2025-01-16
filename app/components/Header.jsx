@@ -7,7 +7,7 @@ import Logo from "../../public/logo-pixelynth.svg";
 import Image from "next/image";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { doc, getDoc, getFirestore, setDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore"; // Add getDoc import
-import { app, db } from '@/app/db/firebaseConfig';
+import { app, db, auth } from '@/app/db/firebaseConfig'; // Update import to include auth
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -54,7 +54,6 @@ export default function Header() {
 
     useEffect(() => {
         const checkAdmin = async () => {
-            const auth = getAuth();
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     const idTokenResult = await user.getIdTokenResult();
