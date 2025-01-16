@@ -130,7 +130,7 @@ const ArticleItem = React.memo(({ item }) => {
     }
 }, [item, storage, session?.user?.email]);
 
-  const getJpgUrl = (pngUrl, appendJpg = true) => {
+  const getJpgUrl = (pngUrl) => {
     if (!pngUrl) return '';
     
     // Extraire le nom du fichier de l'URL PNG
@@ -140,12 +140,8 @@ const ArticleItem = React.memo(({ item }) => {
       .split('%2F')[1]  // Prendre le nom après images%2F
       .replace('.png', '');  // Enlever l'extension
       
-    // Construire l'URL JPG avec the option to append .jpg
-    if (appendJpg) {
-      return `https://firebasestorage.googleapis.com/v0/b/pixelynth-c41ea.firebasestorage.app/o/jpg%2F${filename}.jpg?alt=media`;
-    } else {
-      return `https://firebasestorage.googleapis.com/v0/b/pixelynth-c41ea.firebasestorage.app/o/jpg%2F${filename}?alt=media`;
-    }
+    // Construire l'URL JPG avec la même structure
+    return `https://firebasestorage.googleapis.com/v0/b/pixelynth-c41ea.firebasestorage.app/o/jpg%2F${filename}.jpg?alt=media`;
   }
 
   return (
@@ -167,20 +163,13 @@ const ArticleItem = React.memo(({ item }) => {
         {item?.image && (
           <>
             <Image
-              src={getJpgUrl(item?.image, true)} // Added appendJpg parameter
+              src={getJpgUrl(item?.image)}
               alt={item?.title || "Image"}
               width={500}
               height={500}
               className='rounded-3xl cursor-pointer z-10'
-              loading="lazy"
-              priority={false}
               quality={60}
               sizes="(max-width: 600px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              placeholder="blur"
-              blurDataURL={item?.blurDataUrl || BLUR_DATA_URL}
-              onError={(e) => {
-                e.target.src = getJpgUrl(item?.image, false); // Fallback without .jpg
-              }}
             />
             {/* Add gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent rounded-b-3xl z-20" />
