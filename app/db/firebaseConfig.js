@@ -6,12 +6,13 @@ import { getStorage } from 'firebase/storage'; // Keep only one import
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_API_KEY, // Updated to use NEXT_PUBLIC_API_KEY
-  authDomain: "pixelynth-c41ea.firebaseapp.com",
-  projectId: "pixelynth-c41ea",
-  storageBucket: "pixelynth-c41ea.firebasestorage.app",
-  messagingSenderId: "706633323779",
-  appId: "1:706633323779:web:f21901e917d97c2422c536",
-  measurementId: "G-E5T0G2RLTQ"
+  apiKey: process.env.NEXT_PUBLIC_API_KEY, 
+  authDomain: process.env.NEXT_PUBLIC_AUTH_DOMAIN, 
+  projectId: process.env.NEXT_PUBLIC_PROJECT_ID, 
+  storageBucket: process.env.NEXT_PUBLIC_STORAGE_BUCKET, 
+  messagingSenderId: process.env.NEXT_PUBLIC_MESSAGING_SENDER_ID, 
+  appId: process.env.NEXT_PUBLIC_APP_ID, 
+  measurementId: process.env.NEXT_PUBLIC_MEASUREMENT_ID
 };
 
 // Initialize Firebase

@@ -1,6 +1,6 @@
 [
     {
-      "origin": ["https://www.pixelynth.com"],, 
+      "origin": ["https://www.pixelynth.com"], 
       "responseHeader": ["Content-Type"],
       "method": ["GET", "POST", "PUT"],
       "maxAgeSeconds": 3600
