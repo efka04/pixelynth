@@ -143,12 +143,21 @@ export default function Header() {
         }
     };
 
+    const handleLogoClick = () => {
+        setSearchTerm(''); // Reset search term
+        performSearch('', 'all'); // Reset search results
+        router.push('/'); // Navigate to home page
+    };
+
     return (
         <header className="bg-white shadow-sm sticky top-0 z-50">
             <nav className="max-w-7xl mx-auto bg-white">
                 <div className="flex flex-col">
                     <div className='flex gap-2 md:gap-4 items-center p-4'>
-                        <button onClick={() => router.push('/')} className="flex items-center gap-2">
+                        <button 
+                            onClick={handleLogoClick} 
+                            className="flex items-center gap-2"
+                        >
                             <span className="font-bold text-black md:text-xl">Pixelynth</span>
                         </button>
                         <div className="flex items-center gap-4 flex-grow">
