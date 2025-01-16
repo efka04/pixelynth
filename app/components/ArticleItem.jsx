@@ -90,7 +90,7 @@ const ArticleItem = React.memo(({ item, priority = false }) => {
             try {
                 const userDownloadsRef = collection(db, 'users', session.user.email, 'downloadHistory');
                 await addDoc(userDownloadsRef, {
-                    imageUrl: item.image,
+                    imageUrl: item.image, // Store original path instead of URL
                     title: item.title,
                     timestamp: new Date(),
                     articleId: item.id,
@@ -98,36 +98,31 @@ const ArticleItem = React.memo(({ item, priority = false }) => {
                 });
             } catch (error) {
                 console.error("Error saving download history:", error);
+                // Continue with download even if history saving fails
             }
         }
 
-        // Create an invisible iframe for download
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
+        // Perform the download
+        const response = await fetch(downloadUrl);
+        if (!response.ok) throw new Error('Download failed');
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
         
         // Get filename from path
         const decodedPath = decodeURIComponent(item.image);
         const fileName = decodedPath.split('/').pop().split('?')[0] + '.png';
 
-        // Use fetch with 'no-cors' mode
-        const response = await fetch(downloadUrl, {
-            mode: 'no-cors',
-            headers: {
-                'Access-Control-Allow-Origin': '*'
-            }
-        });
-
-        // Create download link in the iframe
-        const link = iframe.contentDocument.createElement('a');
-        link.href = downloadUrl;
+        // Create download link
+        const link = document.createElement('a');
+        link.href = blobUrl;
         link.download = fileName;
+        document.body.appendChild(link);
         link.click();
-
-        // Clean up
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 1000);
+        
+        // Cleanup
+        window.URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(link);
 
     } catch (error) {
         console.error("Download error:", error);
