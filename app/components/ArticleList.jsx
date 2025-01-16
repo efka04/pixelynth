@@ -1,22 +1,26 @@
 "use client"
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import ArticleItem from '@/app/components/ArticleItem';
 import { useColor } from '../context/ColorContext';
 import { useSearch } from '../context/SearchContext';
 import { useCategory } from '../context/CategoryContext';
+import Masonry from 'react-masonry-css';
 
-const ITEMS_PER_PAGE = 8; // Réduit pour un meilleur chargement initial
-const PRELOAD_THRESHOLD = 2; // Nombre de pages à précharger
+const ITEMS_PER_PAGE = 16; // Réduit pour un meilleur chargement initial
+const PRELOAD_THRESHOLD = 3; // Nombre de pages à précharger
+
+const breakpointColumns = {
+  default: 4,
+  1280: 4,
+  1024: 3,
+  768: 2,
+  640: 2
+};
 
 const ArticleList = React.memo(({ listPosts }) => {
   const { selectedColor } = useColor();
   const { selectedPeople, selectedOrientation, selectedSort } = useSearch(); // Add selectedOrientation
   const { selectedCategory } = useCategory();
-  const [displayedPosts, setDisplayedPosts] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const observerTarget = useRef(null);
-  const [isPreloading, setIsPreloading] = useState(false);
 
   const filteredPosts = useMemo(() => {
     let posts = [...listPosts].filter(post => {
@@ -44,63 +48,8 @@ const ArticleList = React.memo(({ listPosts }) => {
     }
   }, [listPosts, selectedColor, selectedPeople, selectedSort, selectedCategory, selectedOrientation]); // Add selectedOrientation to dependencies
 
-  const preloadNextPage = useCallback(() => {
-    if (isPreloading) return;
-    setIsPreloading(true);
-    
-    const nextPageItems = filteredPosts.slice(
-      displayedPosts.length,
-      displayedPosts.length + ITEMS_PER_PAGE * PRELOAD_THRESHOLD
-    );
-    
-    // Précharger les images
-    nextPageItems.forEach(item => {
-      const img = new Image();
-      img.src = item.image.replace('/images/', '/jpg/').replace('.png', '.jpg');
-    });
-    
-    setIsPreloading(false);
-  }, [filteredPosts, displayedPosts.length, isPreloading]);
-
-  const loadMorePosts = useCallback(() => {
-    const nextPosts = filteredPosts.slice(0, page * ITEMS_PER_PAGE);
-    setDisplayedPosts(nextPosts);
-    setHasMore(nextPosts.length < filteredPosts.length);
-    
-    // Précharger la prochaine page
-    if (hasMore) {
-      preloadNextPage();
-    }
-  }, [filteredPosts, page, hasMore, preloadNextPage]);
-
-  // Observer avec threshold plus élevé pour un chargement plus anticipé
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore) {
-          setPage(prev => prev + 1);
-        }
-      },
-      { threshold: 0.5, rootMargin: '100px' }
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-    setDisplayedPosts([]);
-  }, [selectedColor, selectedPeople, selectedCategory, selectedSort]);
-
-  // Load posts when page changes
-  useEffect(() => {
-    loadMorePosts();
-  }, [loadMorePosts, page]);
+  // Render all posts directly
+  const displayedPosts = filteredPosts;
 
   return (
     <>
@@ -109,20 +58,15 @@ const ArticleList = React.memo(({ listPosts }) => {
           No pictures found.
         </div>
       ) : (
-        <div className='mt-7 px-2 md:px-5 columns-2 md:columns-3 lg:columns-4 mb-4 xl:columns-4 space-y-6 mx-auto'>
-          {displayedPosts.map((item, index) => (
-            <ArticleItem 
-              key={item.id} 
-              item={item}
-              priority={index < ITEMS_PER_PAGE} // Priorité aux premières images
-            />
+        <Masonry
+          breakpointCols={breakpointColumns}
+          className="flex w-auto px-2 md:px-5"
+          columnClassName="bg-clip-padding space-y-6 px-2"
+        >
+          {displayedPosts.map((item) => (
+            <ArticleItem key={item.id} item={item} />
           ))}
-        </div>
-      )}
-      {hasMore && (
-        <div ref={observerTarget} className="h-10 w-full flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-500 border-t-transparent" />
-        </div>
+        </Masonry>
       )}
     </>
   );
