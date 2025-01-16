@@ -4,9 +4,18 @@ import ArticleItem from '@/app/components/ArticleItem';
 import { useColor } from '../context/ColorContext';
 import { useSearch } from '../context/SearchContext';
 import { useCategory } from '../context/CategoryContext';
+import Masonry from 'react-masonry-css';
 
 const ITEMS_PER_PAGE = 8; // Réduit pour un meilleur chargement initial
 const PRELOAD_THRESHOLD = 2; // Nombre de pages à précharger
+
+const breakpointColumns = {
+  default: 4,
+  1280: 4,
+  1024: 3,
+  768: 2,
+  640: 2
+};
 
 const ArticleList = React.memo(({ listPosts }) => {
   const { selectedColor } = useColor();
@@ -49,11 +58,15 @@ const ArticleList = React.memo(({ listPosts }) => {
           No pictures found.
         </div>
       ) : (
-        <div className='mt-7 px-2 md:px-5 columns-2 md:columns-3 lg:columns-4 mb-4 xl:columns-4 space-y-6 mx-auto'>
+        <Masonry
+          breakpointCols={breakpointColumns}
+          className="flex w-auto px-2 md:px-5"
+          columnClassName="bg-clip-padding space-y-6 px-2"
+        >
           {displayedPosts.map((item) => (
             <ArticleItem key={item.id} item={item} />
           ))}
-        </div>
+        </Masonry>
       )}
     </>
   );
