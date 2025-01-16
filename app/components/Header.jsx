@@ -48,7 +48,7 @@ export default function Header() {
 
     useEffect(() => {
         const checkAdmin = async () => {
-            const auth = getAuth(app); // Initialize Auth with the Firebase app
+            const auth = getAuth();
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     const idTokenResult = await user.getIdTokenResult();
@@ -73,6 +73,11 @@ export default function Header() {
         e.preventDefault();
         console.log('Form submitted with:', searchTerm, selectedCategory); // Debug log
         performSearch(searchTerm, selectedCategory); // Pass selectedCategory
+        
+        // Add navigation to home page
+        if (window.location.pathname !== '/') {
+            router.push('/');
+        }
     };
 
     const handleCategoryClick = (category) => {
