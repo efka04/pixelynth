@@ -63,8 +63,12 @@ const ArticleList = React.memo(({ listPosts }) => {
           className="flex w-auto px-2 md:px-5"
           columnClassName="bg-clip-padding space-y-6 px-2"
         >
-          {displayedPosts.map((item) => (
-            <ArticleItem key={item.id} item={item} />
+          {displayedPosts.map((item, index) => (
+            <ArticleItem 
+              key={item.id} 
+              item={item}
+              priority={index < 8} // Prioritize first 8 images (2 rows in 4-column layout)
+            />
           ))}
         </Masonry>
       )}

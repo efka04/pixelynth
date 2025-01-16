@@ -19,12 +19,18 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"; // Import Firebase 
 import { AiOutlineClose } from "react-icons/ai"; // Import AiOutlineClose for a thinner cross
 
 export default function Header() {
-    const { performSearch, isSearching } = useSearch();
+    const { 
+        performSearch, 
+        isSearching, 
+        setSelectedPeople, 
+        setSelectedOrientation,
+        setSelectedSort 
+    } = useSearch();
     const [searchTerm, setSearchTerm] = useState('');
     const { selectedCategory, setSelectedCategory } = useCategory();
+    const { setSelectedColor } = useColor();
     const { data: session } = useSession();
     const router = useRouter();
-    const { selectedColor } = useColor();
     const categoriesRef = useRef(null);
     const [isAdmin, setIsAdmin] = useState(false); // State to track if user is admin
 
@@ -71,10 +77,18 @@ export default function Header() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log('Form submitted with:', searchTerm, selectedCategory); // Debug log
-        performSearch(searchTerm, selectedCategory); // Pass selectedCategory
         
-        // Add navigation to home page
+        // Reset all filters
+        setSelectedColor(null);
+        setSelectedCategory('');
+        setSelectedPeople('all');
+        setSelectedOrientation('all');
+        setSelectedSort('relevance');
+
+        // Perform search with current search term
+        performSearch(searchTerm, 'all');
+        
+        // Navigate to home page if not already there
         if (window.location.pathname !== '/') {
             router.push('/');
         }
@@ -143,11 +157,30 @@ export default function Header() {
         }
     };
 
-    const handleLogoClick = () => {
-        setSearchTerm(''); // Reset search term
-        performSearch('', 'all'); // Reset search results
-        router.push('/'); // Navigate to home page
-    };
+    const handleLogoClick = useCallback(async () => {
+        // Reset all filters first
+        setSearchTerm('');
+        setSelectedColor(null);
+        setSelectedCategory('');
+        setSelectedPeople('all');
+        setSelectedOrientation('all');
+        setSelectedSort('relevance');
+
+        // Perform search with reset values
+        await performSearch('', 'all');
+
+        // Navigate to home page last
+        router.push('/');
+    }, [
+        setSearchTerm,
+        setSelectedColor,
+        setSelectedCategory,
+        setSelectedPeople,
+        setSelectedOrientation,
+        setSelectedSort,
+        performSearch,
+        router
+    ]);
 
     return (
         <header className="bg-white shadow-sm sticky top-0 z-50">
